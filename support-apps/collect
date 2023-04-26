@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+name=$1
+top -s 1 -stats pid,command,mem,time,cpu,state| rg --line-buffered "PID|${name}"
