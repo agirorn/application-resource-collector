@@ -1,6 +1,8 @@
 use clap::Parser;
 use regex::Regex;
+use std::process;
 use std::{thread, time::Duration};
+use sysinfo::{Pid, PidExt};
 
 mod collect;
 mod sample;
@@ -12,7 +14,12 @@ use crate::sample::*;
 struct Cli {
     name: Option<String>,
 
-    #[arg(short, long, value_name = "FILE", help = "Save collected samples to file")]
+    #[arg(
+        short,
+        long,
+        value_name = "FILE",
+        help = "Save collected samples to file"
+    )]
     out: Option<String>,
 
     #[arg(
@@ -25,7 +32,8 @@ struct Cli {
     delay: Option<u32>,
 }
 
-fn main() -> std::io::Result<()>  {
+fn main() -> std::io::Result<()> {
+    let pid = Pid::from_u32(process::id());
     let mut process_name: String = ".*slow.*".to_owned();
     let mut delay_ms: u32 = 0;
     let cli = Cli::parse();
@@ -36,11 +44,11 @@ fn main() -> std::io::Result<()>  {
         delay_ms = delay
     }
     let delay = Duration::from_millis(delay_ms.into());
-    let process_name_pattern = Regex::new(&format!("^{}$", &process_name).to_owned()).unwrap();
-    let mut system = new_system(&process_name_pattern);
+    let process_name_pattern = Regex::new(&format!("{}", &process_name).to_owned()).unwrap();
+    let mut system = new_system(pid, &process_name_pattern);
     loop {
         thread::sleep(delay);
-        let sample = collect_process_sample(&mut system, &process_name_pattern);
+        let sample = collect_process_sample(pid, &mut system, &process_name_pattern);
         if let Some(out) = cli.out.as_deref() {
             append_to_file(out, &sample);
         }
@@ -49,4 +57,3 @@ fn main() -> std::io::Result<()>  {
         thread::sleep(delay);
     }
 }
-

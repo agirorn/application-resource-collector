@@ -1,20 +1,26 @@
-use sysinfo::{ProcessExt, ProcessRefreshKind, System, SystemExt};
+use sysinfo::{ProcessExt, ProcessRefreshKind, System, SystemExt, Process};
 use human_bytes::human_bytes;
 use regex::Regex;
 use crate::sample;
+use sysinfo::{Pid};
 
-pub fn new_system(process_name_pattern: &Regex) -> System {
+pub fn new_system(pid: Pid, process_name_pattern: &Regex) -> System {
     let mut system = System::new_all();
     system.refresh_processes_specifics(ProcessRefreshKind::everything());
     for (_pid, process) in system.processes() {
-        if process_name_pattern.is_match(process.name()) {
+        if match_process(process, pid, process_name_pattern) {
             process.cpu_usage();
         }
     }
     return system;
 }
 
+pub fn match_process(process: &Process, pid: Pid, pattern: &Regex) -> bool {
+    process.pid() != pid && pattern.is_match(&String::from(process.cmd().join(" ")))
+}
+
 pub fn collect_process_sample(
+    pid: Pid,
     system: &mut System,
     process_name_pattern: &Regex,
 ) -> sample::ProcessSample {
@@ -22,7 +28,7 @@ pub fn collect_process_sample(
     let processes: Vec<sample::Process> = system
         .processes()
         .iter()
-        .filter(|(_pid, process)| process_name_pattern.is_match(process.name()))
+        .filter(|(_pid, process)| match_process(*process, pid, process_name_pattern))
         .map(|(pid, process)| {
             let memory = process.memory();
             sample::Process {
